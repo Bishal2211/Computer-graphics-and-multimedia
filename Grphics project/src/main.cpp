@@ -3,9 +3,21 @@
 #include "glm/glm/glm.hpp"
 #include "glm/glm/gtc/matrix_transform.hpp"
 #include "glm/glm/gtc/type_ptr.hpp"
+
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 #include <cmath>
 
+// ---------- Function declarations ----------
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void processInput(GLFWwindow *window);
+
+// ---------- Window settings ----------
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+
+// ---------- Shaders ----------
 const char* vertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec3 aPos;\n"
 "uniform mat4 transform;\n"
@@ -16,40 +28,54 @@ const char* vertexShaderSource = "#version 330 core\n"
 
 const char* fragmentShaderSource = "#version 330 core\n"
 "out vec4 FragColor;\n"
-"uniform vec3 ourColor;\n"
+"uniform vec4 ourColor;\n"
 "void main()\n"
 "{\n"
-"   FragColor = vec4(ourColor, 1.0);\n"
+"   FragColor = ourColor;\n"
 "}\0";
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
+// ---------- Game Variables ----------
+float boxX = 0.0f, boxY = 0.0f;
+float boxW = 0.25f, boxH = 0.25f; // slightly larger base size
+bool clicked = false;
+bool gotPointThisCycle = false;
+int score = 0;
+double mouseX, mouseY;
+float moveTimer = 0.0f;
+float moveInterval = 2.0f;
 
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+// Convert screen coords to NDC (-1 to 1)
+float toNDC_X(double x) { return (float)(x / (SCR_WIDTH / 2.0) - 1.0); }
+float toNDC_Y(double y) { return (float)(1.0 - y / (SCR_HEIGHT / 2.0)); }
 
-// Draw rectangle (car body or roof)
-void drawRectangle(unsigned int shader, float x, float y, float width, float height, glm::vec3 color, glm::vec3 move);
+// Mouse click callback
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        clicked = true;
+}
 
-// Draw circle (wheels)
-void drawCircle(unsigned int shader, float x, float y, float r, glm::vec3 color, glm::vec3 move);
-
+// ---------- Main ----------
 int main()
 {
+    srand((unsigned)time(0));
+
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Moving Car Animation", NULL, NULL);
-    if (window == NULL)
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Click The Box (Scaling Visible) - Ismam Ahmed", NULL, NULL);
+    if (!window)
     {
         std::cout << "Failed to create GLFW window\n";
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -73,92 +99,15 @@ int main()
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    glUseProgram(shaderProgram);
-
-    double startTime = glfwGetTime();
-
-    while (!glfwWindowShouldClose(window))
-    {
-        processInput(window);
-        glClearColor(0.6f, 0.8f, 1.0f, 1.0f); // sky color
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        double currentTime = glfwGetTime();
-        float moveX = fmod((float)(currentTime - startTime) * 0.3f, 2.0f) - 1.0f; // Move left to right
-        glm::vec3 move(moveX, -0.3f, 0.0f);
-
-        // Color changing
-        float colorChange = fabs(sin(currentTime));
-        glm::vec3 carColor(colorChange, 0.2f, 1.0f - colorChange);
-
-        // Draw car body
-        drawRectangle(shaderProgram, -0.4f, 0.0f, 0.6f, 0.2f, carColor, move);
-        // Draw car roof
-        drawRectangle(shaderProgram, -0.2f, 0.15f, 0.3f, 0.1f, carColor, move);
-        // Draw wheels
-        drawCircle(shaderProgram, -0.3f, -0.05f, 0.07f, {0.0f, 0.0f, 0.0f}, move);
-        drawCircle(shaderProgram,  0.2f, -0.05f, 0.07f, {0.0f, 0.0f, 0.0f}, move);
-
-        glfwSwapBuffers(window);
-        glfwPollEvents();
-    }
-
-    glfwTerminate();
-    return 0;
-}
-
-void drawRectangle(unsigned int shader, float x, float y, float width, float height, glm::vec3 color, glm::vec3 move)
-{
+    // Square (2 triangles)
     float vertices[] = {
-        x, y, 0.0f,
-        x + width, y, 0.0f,
-        x + width, y + height, 0.0f,
-        x, y + height, 0.0f
+        -0.2f, -0.2f, 0.0f,
+         0.2f, -0.2f, 0.0f,
+         0.2f,  0.2f, 0.0f,
+         0.2f,  0.2f, 0.0f,
+        -0.2f,  0.2f, 0.0f,
+        -0.2f, -0.2f, 0.0f
     };
-    unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
-
-    unsigned int VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    int colorLoc = glGetUniformLocation(shader, "ourColor");
-    int transformLoc = glGetUniformLocation(shader, "transform");
-
-    glm::mat4 transform = glm::mat4(1.0f);
-    transform = glm::translate(transform, move);
-
-    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
-    glUniform3fv(colorLoc, 1, glm::value_ptr(color));
-
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-}
-
-void drawCircle(unsigned int shader, float x, float y, float r, glm::vec3 color, glm::vec3 move)
-{
-    const int segments = 40;
-    float vertices[(segments + 2) * 3];
-    vertices[0] = x; vertices[1] = y; vertices[2] = 0.0f;
-
-    for (int i = 0; i <= segments; i++) {
-        float angle = i * 2.0f * 3.14159f / segments;
-        vertices[(i + 1) * 3] = x + r * cos(angle);
-        vertices[(i + 1) * 3 + 1] = y + r * sin(angle);
-        vertices[(i + 1) * 3 + 2] = 0.0f;
-    }
 
     unsigned int VAO, VBO;
     glGenVertexArrays(1, &VAO);
@@ -166,31 +115,111 @@ void drawCircle(unsigned int shader, float x, float y, float r, glm::vec3 color,
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    int colorLoc = glGetUniformLocation(shader, "ourColor");
-    int transformLoc = glGetUniformLocation(shader, "transform");
+    float lastTime = glfwGetTime();
 
-    glm::mat4 transform = glm::mat4(1.0f);
-    transform = glm::translate(transform, move);
+    // Random start
+    boxX = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
+    boxY = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
 
-    glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
-    glUniform3fv(colorLoc, 1, glm::value_ptr(color));
+    // ---------- Render Loop ----------
+    while (!glfwWindowShouldClose(window))
+    {
+        processInput(window);
 
-    glDrawArrays(GL_TRIANGLE_FAN, 0, segments + 2);
+        float currentTime = glfwGetTime();
+        float deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+        moveTimer += deltaTime;
 
+        // Background
+        glClearColor(0.15f, 0.25f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // --- Click check ---
+        if (clicked)
+        {
+            glfwGetCursorPos(window, &mouseX, &mouseY);
+            float mx = toNDC_X(mouseX);
+            float my = toNDC_Y(mouseY);
+
+            if (mx > boxX - boxW && mx < boxX + boxW &&
+                my > boxY - boxH && my < boxY + boxH)
+            {
+                score++;
+                gotPointThisCycle = true;
+                std::cout << "✅ Hit! Score: " << score << std::endl;
+
+                // Move immediately when clicked
+                boxX = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
+                boxY = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
+                moveTimer = 0.0f;
+            }
+            clicked = false;
+        }
+
+        // --- Auto move ---
+        if (moveTimer >= moveInterval)
+        {
+            if (!gotPointThisCycle)
+            {
+                score--;
+                std::cout << "❌ Missed! Score: " << score << std::endl;
+            }
+
+            boxX = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
+            boxY = (float)(rand() % 200 - 100) / 100.0f * 0.7f;
+            moveTimer = 0.0f;
+            gotPointThisCycle = false;
+        }
+
+        // --- Animated Color ---
+        float red   = (sin(currentTime * 1.2f) + 1.0f) / 2.0f;
+        float green = (cos(currentTime * 1.3f) + 1.0f) / 2.0f;
+        float blue  = (sin(currentTime * 0.9f) + 1.0f) / 2.0f;
+
+        // --- Visible Scaling Animation ---
+        float scaleFactor = (sin(currentTime * 2.0f) * 0.15f) + 1.0f;
+
+        // range: 0.7x → 1.7x size, very visible
+
+        // --- Draw the Box ---
+        glUseProgram(shaderProgram);
+        int transformLoc = glGetUniformLocation(shaderProgram, "transform");
+        int colorLoc = glGetUniformLocation(shaderProgram, "ourColor");
+
+        glm::mat4 transform = glm::mat4(1.0f);
+        transform = glm::translate(transform, glm::vec3(boxX, boxY, 0.0f));
+        transform = glm::scale(transform, glm::vec3(boxW * scaleFactor, boxH * scaleFactor, 1.0f));
+
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
+        glUniform4f(colorLoc, red, green, blue, 1.0f);
+
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    // Cleanup
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+    glDeleteProgram(shaderProgram);
+    glfwTerminate();
+    return 0;
 }
 
-void processInput(GLFWwindow* window)
+// ESC to close
+void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
+// Resize viewport
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);

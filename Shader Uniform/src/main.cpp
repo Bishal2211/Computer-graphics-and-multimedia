@@ -155,7 +155,7 @@ int main()
         float redValue = (sin(timeValue) / 2.0f) + 0.5f;
         int vertexColorLocation = glGetUniformLocation(shaderProgram, "ourColor");
         glUseProgram(shaderProgram);
-        glUniform4f(vertexColorLocation, redValue, 0.0f, 0.0f, 1.0f);
+        glUniform4f(vertexColorLocation, 0.0f, redValue, 0.0f, 1.0f);
         
 
         // render the triangle
