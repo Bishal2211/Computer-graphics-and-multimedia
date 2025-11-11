@@ -65,7 +65,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Click The Box (Scaling Visible) - Ismam Ahmed", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Click The Box (Scaling Visible) ", NULL, NULL);
     if (!window)
     {
         std::cout << "Failed to create GLFW window\n";
@@ -181,9 +181,9 @@ int main()
         float blue  = (sin(currentTime * 0.9f) + 1.0f) / 2.0f;
 
         // --- Visible Scaling Animation ---
-        float scaleFactor = (sin(currentTime * 2.0f) * 0.15f) + 1.0f;
-
-        // range: 0.7x → 1.7x size, very visible
+       
+        float scaleFactor = sin(glfwGetTime()) * 0.5f + 1.0f; // Sin gives a value between -1 and 1, so scale from 0.5 to 1.5
+       
 
         // --- Draw the Box ---
         glUseProgram(shaderProgram);
